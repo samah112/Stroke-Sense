@@ -49,6 +49,10 @@ class AtrialFibrillationStatus(Enum):
 @dataclass
 class FSRPAssessment:
     """Framingham Stroke Risk Profile Assessment"""
+    # Highest possible score: age 6 + female 1 + BP 3 + BP treatment 1
+    # + diabetes 2 + smoking 2 + heart disease 2 + atrial fibrillation 4
+    MAX_SCORE = 21
+
     age: int
     gender: Gender
     systolic_bp: int
@@ -122,18 +126,25 @@ class FSRPAssessment:
             return RiskLevel.VERY_HIGH
     
     def get_risk_percentage(self) -> float:
-        """Estimate 10-year stroke risk percentage based on score"""
+        """Estimate 10-year stroke risk percentage based on score.
+
+        This is an approximation for the simplified point system above, not the
+        official sex-specific FSRP tables. A probability can never exceed 100%,
+        so scores at the top of the scale (13 and above) are capped at the
+        highest value in the table.
+        """
         score = self.calculate_score()
-        
-        # Approximate risk percentages based on FSRP guidelines
+
+        # Approximate risk percentages for the simplified point system
         risk_mapping = {
             0: 0.5, 1: 0.8, 2: 1.2, 3: 1.8,
             4: 2.7, 5: 4.0, 6: 5.9, 7: 8.7,
             8: 12.8, 9: 18.9, 10: 27.8, 11: 40.9,
-            12: 60.2, 13: 88.5, 14: 130.2, 15: 191.5
+            12: 60.2, 13: 88.5
         }
-        
-        return risk_mapping.get(min(score, 15), 200.0)
+        top_score = max(risk_mapping)
+
+        return risk_mapping[min(max(score, 0), top_score)]
     
     def to_dict(self) -> Dict:
         """Convert assessment to dictionary for storage"""

@@ -81,6 +81,8 @@ To enable cloud storage, create a Firebase project, download a **service account
 Update `storageBucket` in `models/firebase_backend.py` to match your bucket.
 **Never commit your service account key.** It is already excluded by `.gitignore`.
 
+🔒 **Privacy:** face images, voice recordings and facial models are health data, so they are stored **privately**. Uploads return a storage path, not a public link. When a link is needed, use `get_temporary_url()`, which creates a signed URL that expires after 15 minutes.
+
 ---
 
 ## 🔄 How It Works
@@ -106,3 +108,4 @@ This is a working prototype. Some components still use **simulated results or pl
 - Some BE FAST steps in the UI (eyes, arms, speech, balance) currently return simulated scores.
 - SMS, email and calls in the emergency system are mocked (they print to the console). They are designed to plug into a provider such as Twilio.
 - The ML endpoints in `firebase_backend.py` are placeholders.
+- The FSRP module uses a **simplified point system** inspired by the Framingham Stroke Risk Profile (score 0–21), not the official sex-specific FSRP tables. Risk percentages are approximate and capped at the top of the scale.

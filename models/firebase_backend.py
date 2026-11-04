@@ -236,7 +236,13 @@ class UserDataManager:
 
 
 class MediaStorageManager:
-    """Manages media file storage in Firebase Storage"""
+    """Manages media file storage in Firebase Storage.
+
+    Privacy: users' face images, voice recordings, videos and facial models are
+    health / biometric data, so files are kept PRIVATE. Upload methods return the
+    storage path (e.g. "images/<file>.jpg"), not a public URL. Use download_file()
+    inside the backend, or get_temporary_url() when a time-limited link is needed.
+    """
     
     def __init__(self, bucket):
         self.bucket = bucket
@@ -267,10 +273,8 @@ class MediaStorageManager:
             blob = self.bucket.blob(blob_path)
             blob.upload_from_file(img_buffer, content_type='image/jpeg')
             
-            # Make blob publicly accessible (optional)
-            blob.make_public()
-            
-            return blob.public_url
+            # Keep the file private (do NOT call blob.make_public())
+            return blob_path
         except Exception as e:
             print(f"Error uploading image: {e}")
             return None
@@ -285,7 +289,7 @@ class MediaStorageManager:
             blob = self.bucket.blob(blob_path)
             blob.upload_from_string(audio_data, content_type='audio/wav')
             
-            return blob.public_url
+            return blob_path
         except Exception as e:
             print(f"Error uploading audio: {e}")
             return None
@@ -300,7 +304,7 @@ class MediaStorageManager:
             blob = self.bucket.blob(blob_path)
             blob.upload_from_string(video_data, content_type='video/mp4')
             
-            return blob.public_url
+            return blob_path
         except Exception as e:
             print(f"Error uploading video: {e}")
             return None
@@ -317,9 +321,21 @@ class MediaStorageManager:
             blob = self.bucket.blob(blob_path)
             blob.upload_from_string(json_data, content_type='application/json')
             
-            return blob.public_url
+            return blob_path
         except Exception as e:
             print(f"Error uploading baseline model: {e}")
+            return None
+    
+    def get_temporary_url(self, blob_path: str, minutes: int = 15) -> Optional[str]:
+        """Create a time-limited (signed) URL for a private file.
+
+        Requires the backend to be initialized with a service account key.
+        """
+        try:
+            blob = self.bucket.blob(blob_path)
+            return blob.generate_signed_url(expiration=timedelta(minutes=minutes), method="GET")
+        except Exception as e:
+            print(f"Error creating temporary URL: {e}")
             return None
     
     def download_file(self, blob_path: str) -> Optional[bytes]:
@@ -354,11 +370,11 @@ class MLModelProcessor:
             "pose_analysis": "https://your-ml-endpoint.com/pose-analysis"
         }
     
-    def process_facial_analysis(self, image_url: str, user_id: str) -> Dict:
-        """Process facial analysis using ML model"""
+    def process_facial_analysis(self, image_path: str, user_id: str) -> Dict:
+        """Process facial analysis using ML model (image_path = storage path)"""
         try:
             # Download image from storage
-            image_data = self.storage_manager.download_file(image_url)
+            image_data = self.storage_manager.download_file(image_path)
             if not image_data:
                 return {"error": "Failed to download image"}
             
@@ -372,7 +388,7 @@ class MLModelProcessor:
             # Save results to database
             result_data = {
                 "user_id": user_id,
-                "image_url": image_url,
+                "image_path": image_path,
                 "analysis_result": analysis_result,
                 "timestamp": datetime.now().isoformat(),
                 "model_version": "1.0"
@@ -383,11 +399,11 @@ class MLModelProcessor:
             print(f"Error processing facial analysis: {e}")
             return {"error": str(e)}
     
-    def process_speech_analysis(self, audio_url: str, user_id: str) -> Dict:
-        """Process speech analysis using ML model"""
+    def process_speech_analysis(self, audio_path: str, user_id: str) -> Dict:
+        """Process speech analysis using ML model (audio_path = storage path)"""
         try:
             # Download audio from storage
-            audio_data = self.storage_manager.download_file(audio_url)
+            audio_data = self.storage_manager.download_file(audio_path)
             if not audio_data:
                 return {"error": "Failed to download audio"}
             
@@ -397,7 +413,7 @@ class MLModelProcessor:
             # Save results to database
             result_data = {
                 "user_id": user_id,
-                "audio_url": audio_url,
+                "audio_path": audio_path,
                 "analysis_result": analysis_result,
                 "timestamp": datetime.now().isoformat(),
                 "model_version": "1.0"
@@ -538,7 +554,7 @@ class StrokeSenseBackend:
             return False
     
     def upload_media(self, media_type: str, data: Union[np.ndarray, bytes], user_id: str) -> Optional[str]:
-        """Upload media file"""
+        """Upload media file privately; returns its storage path (not a public URL)"""
         if not self.is_ready():
             return None
         
@@ -551,15 +567,15 @@ class StrokeSenseBackend:
         else:
             return None
     
-    def process_ml_analysis(self, analysis_type: str, media_url: str, user_id: str) -> Dict:
-        """Process ML analysis"""
+    def process_ml_analysis(self, analysis_type: str, media_path: str, user_id: str) -> Dict:
+        """Process ML analysis (media_path = storage path returned by upload_media)"""
         if not self.is_ready():
             return {"error": "Backend not ready"}
         
         if analysis_type == "facial":
-            return self.ml_processor.process_facial_analysis(media_url, user_id)
+            return self.ml_processor.process_facial_analysis(media_path, user_id)
         elif analysis_type == "speech":
-            return self.ml_processor.process_speech_analysis(media_url, user_id)
+            return self.ml_processor.process_speech_analysis(media_path, user_id)
         else:
             return {"error": "Unknown analysis type"}
     

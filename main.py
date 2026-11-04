@@ -297,7 +297,7 @@ class StrokeSenseMainApp(StrokeSenseApp):
         # Score
         score_label = ctk.CTkLabel(
             results_frame,
-            text=f"Risk Score: {assessment.calculate_score()}/15",
+            text=f"Risk Score: {assessment.calculate_score()}/{assessment.MAX_SCORE}",
             font=Fonts.BODY_LARGE,
             text_color=ColorScheme.TEXT_PRIMARY
         )
