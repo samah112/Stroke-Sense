@@ -56,18 +56,44 @@ class StrokeSenseMainApp(StrokeSenseApp):
         # Initialize user onboarding
         self._start_user_onboarding()
     
+    def _new_onboarding_screen(self):
+        """Create a fresh full-size screen for onboarding steps.
+
+        The onboarding screens used to destroy every widget inside content_frame,
+        which also destroyed the main views (dashboard, assessment, progress,
+        emergency) and crashed the app when returning to the dashboard.
+        Now the views are only hidden, and onboarding is drawn in its own frame.
+        """
+        self._close_onboarding_screen()
+        for view in self.views.values():
+            view.grid_remove()
+        self.onboarding_screen = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.onboarding_screen.grid(row=0, column=0, sticky="nsew")
+        return self.onboarding_screen
+
+    def _close_onboarding_screen(self):
+        """Remove the onboarding screen if one is shown"""
+        screen = getattr(self, "onboarding_screen", None)
+        if screen is not None:
+            screen.destroy()
+            self.onboarding_screen = None
+
+    def _show_view(self, view_name: str):
+        """Show a main view (override: close any onboarding screen first)"""
+        self._close_onboarding_screen()
+        super()._show_view(view_name)
+
     def _start_user_onboarding(self):
         """Start user onboarding process"""
         self._show_onboarding_welcome()
     
     def _show_onboarding_welcome(self):
         """Show welcome screen for new users"""
-        # Clear main content
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        # Show a fresh onboarding screen (keeps the main views intact)
+        screen = self._new_onboarding_screen()
         
         # Create welcome screen
-        welcome_frame = ctk.CTkFrame(self.content_frame)
+        welcome_frame = ctk.CTkFrame(screen)
         welcome_frame.pack(expand=True, fill="both", padx=50, pady=50)
         
         # Welcome title
@@ -107,12 +133,11 @@ class StrokeSenseMainApp(StrokeSenseApp):
     
     def _show_fsrp_questionnaire(self):
         """Show FSRP questionnaire"""
-        # Clear content
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        # Show a fresh onboarding screen (keeps the main views intact)
+        screen = self._new_onboarding_screen()
         
         # Create questionnaire frame
-        questionnaire_frame = ctk.CTkFrame(self.content_frame)
+        questionnaire_frame = ctk.CTkFrame(screen)
         questionnaire_frame.pack(expand=True, fill="both", padx=20, pady=20)
         
         # Title
@@ -241,12 +266,11 @@ class StrokeSenseMainApp(StrokeSenseApp):
     
     def _show_fsrp_results(self, assessment: FSRPAssessment):
         """Show FSRP assessment results"""
-        # Clear content
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        # Show a fresh onboarding screen (keeps the main views intact)
+        screen = self._new_onboarding_screen()
         
         # Create results frame
-        results_frame = ctk.CTkFrame(self.content_frame)
+        results_frame = ctk.CTkFrame(screen)
         results_frame.pack(expand=True, fill="both", padx=50, pady=50)
         
         # Title
@@ -360,12 +384,11 @@ class StrokeSenseMainApp(StrokeSenseApp):
     
     def _show_baseline_instructions(self):
         """Show baseline setup instructions"""
-        # Clear content
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        # Show a fresh onboarding screen (keeps the main views intact)
+        screen = self._new_onboarding_screen()
         
         # Create instructions frame
-        instructions_frame = ctk.CTkFrame(self.content_frame)
+        instructions_frame = ctk.CTkFrame(screen)
         instructions_frame.pack(expand=True, fill="both", padx=50, pady=50)
         
         # Title
@@ -428,12 +451,11 @@ This baseline will be used to detect any changes in your facial symmetry during 
     
     def _show_camera_capture(self):
         """Show camera capture interface"""
-        # Clear content
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        # Show a fresh onboarding screen (keeps the main views intact)
+        screen = self._new_onboarding_screen()
         
         # Create camera frame
-        camera_frame = ctk.CTkFrame(self.content_frame)
+        camera_frame = ctk.CTkFrame(screen)
         camera_frame.pack(expand=True, fill="both", padx=20, pady=20)
         
         # Title
@@ -1093,6 +1115,8 @@ This baseline will be used to detect any changes in your facial symmetry during 
     
     def _return_to_dashboard(self):
         """Return to main dashboard"""
+        # Reset the assessment area so a new assessment can be started next time
+        self._show_befast_assessment()
         self._show_view("dashboard")
     
     def _view_progress(self):

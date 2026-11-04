@@ -1,5 +1,5 @@
 numpy
-opencv-python
+opencv-python<5  # 5.x removed CascadeClassifier used by this project
 Pillow
 customtkinter
 librosa==0.11.0

@@ -355,8 +355,8 @@ class EmergencyResponseManager:
             alert.assessment_data["resolution_notes"] = resolution_notes
             alert.assessment_data["resolved_at"] = datetime.now().isoformat()
             
-            # Move to history
-            self.alert_history.append(alert)
+            # The alert is already in alert_history (added when it was triggered),
+            # so only remove it from the active list - appending again duplicated it
             del self.active_alerts[alert_id]
             
             return True

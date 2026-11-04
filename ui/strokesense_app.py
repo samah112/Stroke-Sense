@@ -135,6 +135,9 @@ class StrokeSenseApp(ctk.CTk):
         
         # Create navigation
         self._create_navigation()
+
+        # Highlight the dashboard button now that navigation exists
+        self._show_view("dashboard")
     
     def _create_header(self):
         """Create application header"""
@@ -492,20 +495,12 @@ class StrokeSenseApp(ctk.CTk):
     
     def _apply_styling(self):
         """Apply consistent styling throughout the app"""
-        # Configure default button styling
-        ctk.CTkButton.configure(
-            self,
-            corner_radius=10,
-            border_width=0,
-            font=Fonts.BUTTON_MEDIUM
-        )
-        
-        # Configure default frame styling
-        ctk.CTkFrame.configure(
-            self,
-            corner_radius=10,
-            border_width=0
-        )
+        # Styling (colors, fonts, corner radius) is applied per widget when it is
+        # created, and the global theme is set via ctk.set_appearance_mode() and
+        # ctk.set_default_color_theme() at the top of this module.
+        # Note: calling ctk.CTkButton.configure(self, ...) on the main window is
+        # invalid (it is not a button) and crashed the app on startup.
+        self.configure(fg_color=ColorScheme.BG_SECONDARY)
     
     def _darken_color(self, color: str, factor: float = 0.8) -> str:
         """Darken a hex color by a factor"""
@@ -524,12 +519,13 @@ class StrokeSenseApp(ctk.CTk):
         for view in self.views.values():
             view.grid_remove()
         
-        # Show selected view
+        # Show selected view (fill the whole content area)
         if view_name in self.views:
-            self.views[view_name].grid()
-        
+            self.views[view_name].grid(row=0, column=0, sticky="nsew")
+
         # Update navigation button states
-        for name, btn in self.nav_buttons.items():
+        # (navigation is created after the content area, so it may not exist yet)
+        for name, btn in getattr(self, "nav_buttons", {}).items():
             if name == view_name:
                 btn.configure(fg_color=ColorScheme.PRIMARY_BLUE)
             else:

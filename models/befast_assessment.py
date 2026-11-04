@@ -174,7 +174,7 @@ class EyeTrackingTest:
         if tracking_accuracy > 0.7:
             result = TestResult.NORMAL
         elif tracking_accuracy > 0.4:
-            result = TestComponent.INCONCLUSIVE
+            result = TestResult.INCONCLUSIVE
         else:
             result = TestResult.ABNORMAL
         

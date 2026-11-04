@@ -271,7 +271,7 @@ class AdvancedCameraProcessor:
             center_of_mass=(center_x, center_y),
             stability_score=stability_score,
             arm_positions=arm_positions,
-            confidence=pose_results.pose_landmarks.visibility
+            confidence=float(np.mean([lm.visibility for lm in pose_results.pose_landmarks.landmark]))
         )
     
     def _extract_eye_data(self, face_results, frame_shape) -> Optional[EyeTrackingData]:

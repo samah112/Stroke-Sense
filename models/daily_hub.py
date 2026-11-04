@@ -551,12 +551,21 @@ class DailyHubManager:
             }
             
             with open(filepath, 'w') as f:
-                json.dump(export_data, f, indent=2)
-            
+                json.dump(export_data, f, indent=2, default=self._json_default)
+
             return True
         except Exception as e:
             print(f"Error exporting data: {e}")
             return False
+
+    @staticmethod
+    def _json_default(value: Any) -> Any:
+        """Convert values that json cannot serialize (Enum, time, datetime)"""
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, (time, datetime)):
+            return value.isoformat()
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
     
     def import_data(self, filepath: str) -> bool:
         """Import hub data from JSON file"""
@@ -567,18 +576,23 @@ class DailyHubManager:
             # Import reminders
             if "reminders" in import_data:
                 for reminder_data in import_data["reminders"]:
+                    # Restore types that were converted to strings on export
+                    reminder_data["type"] = ReminderType(reminder_data["type"])
+                    reminder_data["time"] = time.fromisoformat(reminder_data["time"])
                     reminder = HealthReminder(**reminder_data)
                     self.reminder_manager.reminders.append(reminder)
-            
+
             # Import tips
             if "tips" in import_data:
                 for tip_data in import_data["tips"]:
+                    tip_data["category"] = TipCategory(tip_data["category"])
                     tip = HealthTip(**tip_data)
                     self.tips_manager.tips.append(tip)
             
             # Import activities
             if "activities" in import_data:
                 for activity_data in import_data["activities"]:
+                    activity_data["type"] = ActivityType(activity_data["type"])
                     activity = ActivityRecord(**activity_data)
                     self.progress_tracker.activities.append(activity)
             

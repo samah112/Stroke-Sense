@@ -180,35 +180,33 @@ class FacialAnalyzer:
             'overall_symmetry': 0.0
         }
         
-        if len(landmarks) < 14:
+        # Landmark layout produced by extract_landmarks() when both eyes are detected:
+        #   0-4   left eye      5-9   right eye
+        #   10    mouth left corner    11 mouth right corner
+        #   12    mouth center (lower) 13 mouth center (upper)
+        #   14    left eyebrow         15 right eyebrow
+        if len(landmarks) < 16:
             return symmetry_scores
-        
+
         # Eye symmetry (compare left and right eye positions)
-        if len(landmarks) >= 10:
-            left_eye_center = self._get_center_point(landmarks[:5])
-            right_eye_center = self._get_center_point(landmarks[5:10])
-            symmetry_scores['eye_symmetry'] = self._calculate_feature_symmetry(left_eye_center, right_eye_center)
-        
+        left_eye_center = self._get_center_point(landmarks[:5])
+        right_eye_center = self._get_center_point(landmarks[5:10])
+        symmetry_scores['eye_symmetry'] = self._calculate_feature_symmetry(left_eye_center, right_eye_center)
+
         # Eyebrow symmetry
-        if len(landmarks) >= 12:
-            left_eyebrow = landmarks[10]
-            right_eyebrow = landmarks[11]
-            symmetry_scores['eyebrow_symmetry'] = self._calculate_feature_symmetry(left_eyebrow, right_eyebrow)
-        
-        # Mouth symmetry
-        if len(landmarks) >= 14:
-            mouth_left = landmarks[12]
-            mouth_right = landmarks[13]
-            symmetry_scores['mouth_symmetry'] = self._calculate_feature_symmetry(mouth_left, mouth_right)
-        
-        # Overall symmetry (weighted average)
-        weights = [0.3, 0.2, 0.2, 0.3]  # eye, eyebrow, mouth, overall
+        left_eyebrow = landmarks[14]
+        right_eyebrow = landmarks[15]
+        symmetry_scores['eyebrow_symmetry'] = self._calculate_feature_symmetry(left_eyebrow, right_eyebrow)
+
+        # Mouth symmetry (compare the two mouth corners - drooping shows here)
+        mouth_left = landmarks[10]
+        mouth_right = landmarks[11]
+        symmetry_scores['mouth_symmetry'] = self._calculate_feature_symmetry(mouth_left, mouth_right)
+
+        # Overall symmetry (weighted average): eye 30%, eyebrow 20%, mouth 50%
+        weights = {'eye_symmetry': 0.3, 'eyebrow_symmetry': 0.2, 'mouth_symmetry': 0.5}
         symmetry_scores['overall_symmetry'] = sum(
-            score * weight for score, weight in zip(
-                [symmetry_scores['eye_symmetry'], symmetry_scores['eyebrow_symmetry'], 
-                 symmetry_scores['mouth_symmetry'], symmetry_scores['mouth_symmetry']], 
-                weights
-            )
+            symmetry_scores[name] * weight for name, weight in weights.items()
         )
         
         return symmetry_scores
@@ -247,7 +245,7 @@ class FacialAnalyzer:
     def analyze_facial_features(self, image: np.ndarray) -> Optional[FacialFeatures]:
         """Comprehensive facial feature analysis"""
         face_box = self.detect_face(image)
-        if not face_box:
+        if face_box is None:
             return None
         
         landmarks = self.extract_landmarks(image, face_box)
@@ -299,7 +297,7 @@ class BaselineModel:
         }
         
         # Calculate overall deviation score
-        deviation_scores = list(comparison.values())[:-1]  # Exclude error if present
+        deviation_scores = list(comparison.values())
         comparison['overall_deviation'] = sum(deviation_scores) / len(deviation_scores)
         
         return comparison

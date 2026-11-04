@@ -24,22 +24,27 @@ class FacialAnalysisML:
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
         self.model = None
+        self.model_trained = False  # True only when trained weights are loaded from disk
+        self._last_face_image = None  # 64x64x3 face crop used as CNN input
         self.scaler = StandardScaler()
         self.load_model()
-    
+
     def load_model(self):
         """Load pre-trained facial analysis model"""
         try:
-            # Try to load existing model
+            # Try to load existing (trained) model
             if os.path.exists('models/facial_model.h5'):
                 self.model = keras.models.load_model('models/facial_model.h5')
+                self.model_trained = True
             else:
-                # Create a new model if none exists
+                # No trained model yet: build the architecture but do NOT save the
+                # untrained weights, otherwise they would be reloaded as "trained"
                 self.model = self._create_facial_model()
-                self.model.save('models/facial_model.h5')
+                self.model_trained = False
         except Exception as e:
             print(f"Error loading facial model: {e}")
             self.model = self._create_facial_model()
+            self.model_trained = False
     
     def _create_facial_model(self):
         """Create facial analysis CNN model"""
@@ -72,15 +77,17 @@ class FacialAnalysisML:
         faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         
         if len(faces) == 0:
+            self._last_face_image = None
             return np.zeros(50)  # Return zero features if no face detected
-        
+
         # Use the largest face
         face = max(faces, key=lambda x: x[2] * x[3])
         x, y, w, h = face
-        
-        # Extract face region
+
+        # Extract face region (kept as the CNN input image, scaled to [0, 1])
         face_roi = image[y:y+h, x:x+w]
         face_resized = cv2.resize(face_roi, (64, 64))
+        self._last_face_image = face_resized.astype(np.float32) / 255.0
         
         # Extract eyes
         eyes = self.eye_cascade.detectMultiScale(gray[y:y+h, x:x+w])
@@ -105,7 +112,7 @@ class FacialAnalysisML:
                 abs(left_eye[0] - right_eye[0])  # horizontal distance
             ])
         else:
-            features.extend([0] * 9)  # No eyes detected
+            features.extend([0] * 10)  # No eyes detected (same length as the branch above)
         
         # Symmetry features
         face_center_x = x + w // 2
@@ -147,12 +154,14 @@ class FacialAnalysisML:
                 'risk_level': 'high'
             }
         
-        # Normalize features
-        features_normalized = self.scaler.fit_transform(features.reshape(1, -1))
-        
-        # Use ML model for prediction
+        # The CNN is only meaningful once it has been trained; until then use the
+        # rule-based analysis instead of returning random predictions
+        if not self.model_trained or self._last_face_image is None:
+            return self._rule_based_symmetry_analysis(features)
+
+        # Use ML model for prediction (CNN expects a 64x64x3 face image)
         try:
-            prediction = self.model.predict(features_normalized, verbose=0)
+            prediction = self.model.predict(self._last_face_image[np.newaxis, ...], verbose=0)
             
             # Interpret prediction (assuming 5 classes: normal, mild_asymmetry, moderate_asymmetry, severe_asymmetry, stroke_like)
             class_labels = ['normal', 'mild_asymmetry', 'moderate_asymmetry', 'severe_asymmetry', 'stroke_like']
@@ -193,11 +202,14 @@ class FacialAnalysisML:
                 'risk_level': 'high'
             }
         
-        # Extract key features
-        face_aspect_ratio = features[2] if len(features) > 2 else 1.0
-        eye_vertical_diff = features[8] if len(features) > 8 else 0
-        eye_horizontal_dist = features[9] if len(features) > 9 else 0
-        symmetry_score = features[12] if len(features) > 12 else 0
+        # Extract key features (indices follow extract_facial_features):
+        #   2 = face aspect ratio, 11 = eye vertical misalignment (px),
+        #   15 = |left - right| eye-to-center distance, 16 = average distance
+        face_aspect_ratio = features[2]
+        eye_vertical_diff = features[11]
+        avg_eye_distance = features[16]
+        # Relative asymmetry in [0, 1]: 0 = perfectly symmetric
+        symmetry_score = features[15] / avg_eye_distance if avg_eye_distance > 0 else 0
         
         # Calculate overall symmetry
         overall_symmetry = 1.0
@@ -315,7 +327,8 @@ class SpeechAnalysisML:
             
             # Tempo and rhythm
             tempo, _ = librosa.beat.beat_track(y=audio_data, sr=sample_rate)
-            features.append(tempo)
+            # librosa >= 0.10 returns tempo as a 1-element array
+            features.append(float(np.atleast_1d(tempo)[0]))
             
             # Spectral bandwidth
             bandwidth = librosa.feature.spectral_bandwidth(y=audio_data, sr=sample_rate)[0]
@@ -391,7 +404,8 @@ class SpeechAnalysisML:
         mean_amplitude = features[0] if len(features) > 0 else 0
         std_amplitude = features[1] if len(features) > 1 else 0
         zcr_mean = features[6] if len(features) > 6 else 0
-        tempo = features[32] if len(features) > 32 else 0
+        # Tempo position: 4 basic + 2 centroid + 2 zcr + 26 MFCC + 2 rolloff + 24 chroma = 60
+        tempo = features[60] if len(features) > 60 else 0
         
         # Calculate scores based on heuristics
         clarity_score = 1.0
@@ -562,12 +576,12 @@ class MLModelManager:
     """Main manager for all ML models"""
     
     def __init__(self):
+        # Create models directory first, so the analyzers can save their model files
+        os.makedirs('models', exist_ok=True)
+
         self.facial_analyzer = FacialAnalysisML()
         self.speech_analyzer = SpeechAnalysisML()
         self.pose_analyzer = PoseAnalysisML()
-        
-        # Create models directory if it doesn't exist
-        os.makedirs('models', exist_ok=True)
     
     def analyze_facial_symmetry(self, image: np.ndarray) -> Dict[str, float]:
         """Analyze facial symmetry using ML"""

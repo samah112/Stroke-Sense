@@ -58,7 +58,7 @@ class AudioProcessor:
         self.audio = None
         self.stream = None
         self.recording_thread = None
-        self.stop_recording = False
+        self._stop_requested = False
         
         # Data storage
         self.audio_queue = queue.Queue(maxsize=50)
@@ -107,7 +107,7 @@ class AudioProcessor:
             )
             
             self.state = AudioState.RECORDING
-            self.stop_recording = False
+            self._stop_requested = False
             self.recording_buffer = []
             
             # Start recording thread
@@ -127,7 +127,7 @@ class AudioProcessor:
         if self.state != AudioState.RECORDING:
             return None
         
-        self.stop_recording = True
+        self._stop_requested = True
         
         if self.recording_thread and self.recording_thread.is_alive():
             self.recording_thread.join(timeout=2.0)
@@ -186,7 +186,7 @@ class AudioProcessor:
     
     def _recording_loop(self):
         """Main recording loop"""
-        while not self.stop_recording and self.stream:
+        while not self._stop_requested and self.stream:
             try:
                 time.sleep(0.01)  # Small delay to prevent CPU overload
             except Exception as e:
@@ -450,7 +450,7 @@ class SpeechFeatureExtractor:
                 rhythm_regularity = 0
             
             return {
-                'tempo': float(tempo),
+                'tempo': float(np.atleast_1d(tempo)[0]),
                 'rhythm_regularity': float(rhythm_regularity),
                 'onset_count': float(len(onset_frames))
             }
