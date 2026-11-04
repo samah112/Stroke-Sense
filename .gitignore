@@ -1,0 +1,31 @@
+# Virtual environments
+stroke_sense_env/
+venv/
+.venv/
+env/
+
+# Python cache (incl. numba cache files .nbi / .nbc)
+__pycache__/
+*.py[cod]
+*.nbi
+*.nbc
+
+# Firebase / secrets - never commit credentials
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+.env
+.env.*
+
+# Generated user data (personal health data - keep private)
+user_profile_*.json
+baseline_*.json
+
+# Generated / trained model files
+models/*.h5
+models/*.pkl
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

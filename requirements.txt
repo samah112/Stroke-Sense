@@ -1,0 +1,13 @@
+numpy
+opencv-python
+Pillow
+customtkinter
+librosa==0.11.0
+pyaudio
+mediapipe
+tensorflow
+scikit-learn
+joblib
+firebase-admin
+requests
+geocoder
